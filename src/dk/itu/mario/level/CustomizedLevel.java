@@ -19,23 +19,23 @@ public class CustomizedLevel extends Level implements LevelInterface {
     private static final int ODDS_JUMP = 3;
     private static final int ODDS_CANNONS = 4;
     private static final int JumpingThreshold = 3;
-    
+
     private int[] odds = new int[5];
     private int totalOdds;
-    
+
     private int difficulty;
     private int type;
     private int gaps;
     private int turtles;
     private int coins;
-    
+
     private GamePlay playerM;
 
     public CustomizedLevel(int width, int height, long seed, int difficulty,
                            int type, GamePlay playerMetrics) {
         super(width, height);
         this.playerM = playerMetrics;
-        creat(seed, difficulty, type);
+        //creat(seed, difficulty, type);
     }
 
     public void creat(long seed, int difficulty, int type) {
