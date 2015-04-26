@@ -1,6 +1,8 @@
 package dk.itu.mario.level;
 
 import java.util.Random;
+import java.util.ArrayList;
+import java.lang.Math;
 
 import dk.itu.mario.MarioInterface.Constraints;
 import dk.itu.mario.MarioInterface.GamePlay;
@@ -17,10 +19,6 @@ public class MyLevel extends Level{
 	public int BLOCKS_POWER = 0; // the number of power blocks
 	public int COINS = 0; //These are the coins in boxes that Mario collect
 
-	private int perJump;
-	private int perCoin;
-	private int perKill; //not implemented
-
 	private static Random levelSeedRandom = new Random();
 	public static long lastSeed;
 
@@ -29,38 +27,27 @@ public class MyLevel extends Level{
 	private int difficulty;
     private int type;
 	private int gaps;
+	private ArrayList<Integer> blocks;
+	private ArrayList<ArrayList<Decoration>> decorations;
+	private double jumpWeight, cannonWeight, hillWeight, tubeWeight, straightWeight;
 
 	public MyLevel(int width, int height)
     {
 		super(width, height);
+		blocks = new ArrayList<Integer>();
+		decorations = new ArrayList<ArrayList<Decoration>>();
     }
 
 	public MyLevel(int width, int height, long seed, int difficulty, int type, GamePlay playerMetrics)
     {
         this(width, height);
-		parseMetrics(playerMetrics);
-        creat(seed, difficulty, type);
+        creat(seed, difficulty, type, playerMetrics);
     }
 
-	public void parseMetrics(GamePlay playerMetrics)
-	{
-		double jumpsNumber = (double)playerMetrics.jumpsNumber;
-		double aimlessJumps = playerMetrics.aimlessJumps; //might cast to int from double
-		double coinsCollected = (double)playerMetrics.coinsCollected;
-		double totalCoins = (double)playerMetrics.totalCoins;
-		double completionTime = (double)playerMetrics.completionTime;
-
-		perJump = (int) ((jumpsNumber / completionTime) * 100); // percentage of time in air (approximately)
-		perCoin = (int) ((coinsCollected / totalCoins) * 100); // percentage of coins collected
-		//maybe figure out running time --> too flat of a map
-	}
-
-    public void creat(long seed, int difficulty, int type)
+    public void creat(long seed, int difficulty, int type, GamePlay playerMetrics)
     {
         this.type = type;
         this.difficulty = difficulty;
-
-		System.out.printf("perJump: %d, perCoin: %d\n", perJump, perCoin);
 
         lastSeed = seed;
         random = new Random(seed);
@@ -69,22 +56,17 @@ public class MyLevel extends Level{
         int length = 0;
         length += buildStraight(0, width, true);
 
+		//construct weights
+		createWeights(playerMetrics);
+
+		blocks.clear();
+		decorations.clear();
+
         //create all of the medium sections
         while (length < width - 64)
         {
-            //length += buildZone(length, width - length);
-			//if (random.nextInt(100) < 30)
-			//	length += buildStraight(length, width-length, false);
-			if (random.nextInt(100) < 30)
-				length += buildStraight(length, width-length, false);
-			if (random.nextInt(100) < perJump)
-				length += buildHillStraight(length, width-length);
-			if (random.nextInt(100) < perJump)
-				length += buildJump(length, width-length);
-			if (random.nextInt(100) < perJump)
-				length += buildTubes(length, width-length);
-			if (random.nextInt(100) < perJump)
-				length += buildCannons(length, width-length);
+            decorations.add(new ArrayList<Decoration>());
+			length += buildRandomBlock(length, width - length);
         }
 
         //set the end piece
@@ -130,6 +112,54 @@ public class MyLevel extends Level{
 
     }
 
+	private int buildRandomBlock(int xo, int maxLength) {
+		double rDouble = random.nextDouble();
+
+		if(rDouble <= jumpWeight) {
+			blocks.add(0);
+			return buildJump(xo, maxLength);
+		} else if(rDouble <= cannonWeight) {
+			blocks.add(1);
+			return buildCannons(xo, maxLength);
+		} else if(rDouble <= hillWeight) {
+			blocks.add(2);
+			return buildHillStraight(xo, maxLength);
+		} else if(rDouble <= tubeWeight) {
+			blocks.add(3);
+			return buildTubes(xo, maxLength);
+		} else if(rDouble <= straightWeight) {
+			blocks.add(4);
+			return buildStraight(xo, maxLength, false);
+		}
+		return 0;
+	}
+
+	/*
+	 * REVISE EVERYTHING IN HERE!
+	 */
+	private void createWeights(GamePlay playerMetrics) {
+		//weight = baseChance + (chanceIncrement * playerOffset)
+
+		jumpWeight = 5 + 1 * (playerMetrics.jumpsNumber - 22);
+		cannonWeight = 1 + 0.5 * playerMetrics.CannonBallKilled - 0.5 * playerMetrics.timesOfDeathByCannonBall;
+		hillWeight = 5 + 0.25 * (playerMetrics.aimlessJumps - 10);
+		tubeWeight = 3 + 1 * playerMetrics.ChompFlowersKilled - 0.5 * playerMetrics.timesOfDeathByChompFlower;
+		straightWeight = 10 + 0.05 * playerMetrics.timeRunningRight + 1 * playerMetrics.kickedShells;
+
+		//normalize -> take average
+		double sum = jumpWeight + hillWeight + tubeWeight + straightWeight;
+		jumpWeight /= sum;
+		cannonWeight /= sum;
+		hillWeight /= sum;
+		tubeWeight /= sum;
+		straightWeight /= sum;
+
+		//offset to cover [0,1] -> straightWeight should be 1
+		cannonWeight += jumpWeight;
+		hillWeight += cannonWeight;
+		tubeWeight += hillWeight;
+		straightWeight += tubeWeight;
+	}
 
     private int buildJump(int xo, int maxLength)
     {
@@ -433,11 +463,12 @@ public class MyLevel extends Level{
         int s = random.nextInt(4);
         int e = random.nextInt(4);
 
-        if ((random.nextInt(100) < perCoin) && (floor - 2 > 0)) {
+        if (floor - 2 > 0) {
             if ((xLength - 1 - e) - (xStart + 1 + s) > 1){
                 for(int x = xStart + 1 + s; x < xLength - 1 - e; x++) {
                     setBlock(x, floor - 2, COIN);
                     COINS++;
+					recordCoin(x, floor - 2, false); //ADDED IN FOR HISTORICAL PURPOSES
                 }
             }
         }
@@ -460,11 +491,13 @@ public class MyLevel extends Level{
                             {
                                 setBlock(x, floor - 4, BLOCK_POWERUP);
                                 BLOCKS_POWER++;
+								recordPowerup(x, floor - 4); //ADDED IN FOR HISTORICAL PURPOSES
                             }
                             else
                             {	//the fills a block with a hidden coin --> USE PERCOIN
                                 setBlock(x, floor - 4, BLOCK_COIN);
                                 BLOCKS_COINS++;
+								recordCoin(x, floor - 2, false); //ADDED IN FOR HISTORICAL PURPOSES
                             }
                         }
                         else if (random.nextInt(4) == 0)
@@ -472,22 +505,36 @@ public class MyLevel extends Level{
                             if (random.nextInt(4) == 0)
                             {
                                 setBlock(x, floor - 4, (byte) (2 + 1 * 16));
+								BLOCKS_POWER++; //ADDED IN
+								recordPowerup(x, floor - 4); //ADDED IN FOR HISTORICAL PURPOSES
                             }
                             else
                             {
                                 setBlock(x, floor - 4, (byte) (1 + 1 * 16));
+								BLOCKS_COINS++;
+								recordCoin(x, floor - 2, false); //ADDED IN FOR HISTORICAL PURPOSES
                             }
                         }
                         else
                         {
                             setBlock(x, floor - 4, BLOCK_EMPTY);
                             BLOCKS_EMPTY++;
+							recordEmptyBlock(x, floor - 4);
                         }
                     }
                 }
             }
         }
     }
+
+	private void undecorate(int blockIndex) {
+		for(Decoration dec : decorations.get(blockIndex)) {
+			if(dec.type != 0) //0 is an enemy -> don't do
+				setBlock(dec.x, dec.y, (byte) 0);
+			//else
+				//removeSpriteTemplate(dec.x, dec.y); //remove the enemy -> need to specify where method is
+		}
+	}
 
     private void fixWalls()
     {
@@ -650,6 +697,31 @@ public class MyLevel extends Level{
         }
     }
 
+	// Same thing as RandomLevel clone but for current level
+	public MyLevel clone() throws CloneNotSupportedException {
+
+		MyLevel clone = new MyLevel(width, height);
+
+		clone.xExit = xExit;
+    	clone.yExit = yExit;
+    	byte[][] map = getMap();
+    	SpriteTemplate[][] st = getSpriteTemplate();
+
+    	for (int i = 0; i < map.length; i++)
+    		for (int j = 0; j < map[i].length; j++) {
+    			clone.setBlock(i, j, map[i][j]);
+    			clone.setSpriteTemplate(i, j, st[i][j]);
+    	}
+    	clone.BLOCKS_COINS = BLOCKS_COINS;
+    	clone.BLOCKS_EMPTY = BLOCKS_EMPTY;
+    	clone.BLOCKS_POWER = BLOCKS_POWER;
+    	clone.ENEMIES = ENEMIES;
+    	clone.COINS = COINS;
+
+        return clone;
+	}
+
+	/**
     public RandomLevel clone() throws CloneNotSupportedException {
 
     	RandomLevel clone=new RandomLevel(width, height);
@@ -673,6 +745,223 @@ public class MyLevel extends Level{
         return clone;
 
       }
+	**/
 
+	private int getDifficulty(GamePlay playerMetrics) {
+		//percentage of time allowed to [1-10] difficulty
+		int time = 5 * (1 - (playerMetrics.completionTime / playerMetrics.totalTime)); //max of 5
+
+		double deaths =
+			playerMetrics.timesOfDeathByArmoredTurtle +
+			playerMetrics.timesOfDeathByCannonBall +
+			playerMetrics.timesOfDeathByChompFlower +
+			playerMetrics.timesOfDeathByFallingIntoGap +
+			playerMetrics.timesOfDeathByGoomba +
+			playerMetrics.timesOfDeathByGreenTurtle +
+			playerMetrics.timesOfDeathByJumpFlower +
+			playerMetrics.timesOfDeathByRedTurtle;
+
+		return time;
+	}
+
+	public double eval(GamePlay playerMetrics) {
+		double blockStdDev = getStdDevOfBlocks();
+		double enemyStdDev = getStdDevOfEnemies();
+		int enemyDifference = getEnemyDifference(playerMetrics);
+		int coinDifference = getCoinDifference(playerMetrics);
+
+		return blockStdDev + enemyStdDev + (enemyDifference / 2) + (coinDifference / 2);
+	}
+
+	private double getStdDevOfBlocks() {
+		int numJumps = getNumOfBlockType(0);
+        int numCannons = getNumOfBlockType(1);
+        int numHills = getNumOfBlockType(2);
+        int numTubes = getNumOfBlockType(3);
+        int numStraights = getNumOfBlockType(4);
+
+        double mean = (numJumps + numCannons + numHills + numTubes + numStraights) / 5;
+
+        double stdDev = Math.pow(mean - numJumps, 2) +
+        Math.pow(mean - numCannons, 2) +
+        Math.pow(mean - numHills, 2) +
+        Math.pow(mean - numTubes, 2) +
+        Math.pow(mean - numStraights, 2);
+        stdDev /= 4;
+        stdDev = Math.sqrt(stdDev);
+
+        return stdDev;
+	}
+
+	private double getStdDevOfEnemies() {
+        int numGoombas = getNumOfEnemyType(Enemy.ENEMY_GOOMBA);
+        int numGreenKoopas = getNumOfEnemyType(Enemy.ENEMY_GREEN_KOOPA);
+        int numRedKoopas = getNumOfEnemyType(Enemy.ENEMY_RED_KOOPA);
+        int numFlowers = getNumOfEnemyType(Enemy.ENEMY_FLOWER);
+        int numSpikys = getNumOfEnemyType(Enemy.ENEMY_SPIKY);
+
+        double mean = (numGoombas + numGreenKoopas + numRedKoopas + numFlowers + numSpikys) / 5;
+
+        double stdDev = Math.pow(mean - numGoombas, 2) +
+        Math.pow(mean - numGreenKoopas, 2) +
+        Math.pow(mean - numRedKoopas, 2) +
+        Math.pow(mean - numFlowers, 2) +
+        Math.pow(mean - numSpikys, 2);
+        stdDev /= 4;
+        stdDev = Math.sqrt(stdDev);
+
+        return stdDev;
+    }
+
+    private int getNumOfEnemyType(int type) {
+        int count = 0;
+
+        for(ArrayList<Decoration> decs : decorations) {
+                for(Decoration dec : decs) {
+                        if(dec.type == 0 && dec.enemyType == type)
+                                count++;
+                }
+        }
+
+        return count;
+    }
+
+    private int getNumOfBlockType(int type) {
+        int count = 0;
+        for(Integer i : blocks) {
+                if(i == type)
+                        count ++;
+        }
+
+        return count;
+    }
+
+    private int getNumCoinsInBlocks() {
+        int count = 0;
+
+        for(ArrayList<Decoration> decs : decorations) {
+                for(Decoration dec : decs) {
+                        if(dec.type == 2 && dec.blockType == 0)
+                                count++;
+                }
+        }
+
+        return count;
+    }
+
+    private int getNumCoinsNotInBlocks() {
+        int count = 0;
+
+        for(ArrayList<Decoration> decs : decorations) {
+                for(Decoration dec : decs) {
+                        if(dec.type == 1)
+                                count++;
+                }
+        }
+
+        return count;
+    }
+
+
+    private int getEnemyDifference(GamePlay player) {
+        int maxGoombas = 10;
+        int maxTurtles = 12;
+
+        int idealGoombas = (player.GoombasKilled / 8) * maxGoombas;
+        int idealTurtles = ((player.RedTurtlesKilled + player.GreenTurtlesKilled) / 8) * maxTurtles;
+
+        //get the difference in the number of enemies there should be
+        int numGoombas = getNumOfEnemyType(Enemy.ENEMY_GOOMBA);
+        int numGreenKoopas = getNumOfEnemyType(Enemy.ENEMY_GREEN_KOOPA);
+        int numRedKoopas = getNumOfEnemyType(Enemy.ENEMY_RED_KOOPA);
+
+        return
+        Math.abs(idealGoombas - numGoombas) +
+        Math.abs(idealTurtles - (numGreenKoopas + numRedKoopas));
+    }
+
+    private int getCoinDifference(GamePlay player) {
+        final int maxCoinBlocks = 30;
+        final int maxCoins = 75;
+
+        int idealCoins, idealBlocks;
+        idealBlocks = (int)(player.percentageCoinBlocksDestroyed * maxCoinBlocks);
+        idealCoins = (int)(((float)player.coinsCollected / (float)player.totalCoins) * maxCoins);
+
+        return Math.abs(idealCoins - getNumCoinsNotInBlocks()) +
+        Math.abs(idealBlocks - getNumCoinsInBlocks());
+    }
+
+    public class Decoration {
+        public int x, y;
+
+        /**
+         * 0 - enemy
+         * 1 - coin
+         * 2 - block
+         *
+         */
+        public int type;
+
+        /**
+         * 0 - Goomba
+         * 1 -
+         */
+        public int enemyType;
+
+
+        /**
+         * 0 - coin
+         * 1 - power up
+         * 2 - empty
+         */
+        public int blockType;
+    }
+
+    private void recordCoin(int x, int y, boolean inBlock) {
+        Decoration coin = new Decoration();
+        coin.x = x;
+        coin.y = y;
+        if(inBlock) {
+                coin.type = 2;
+                coin.blockType = 0;
+        }
+        else {
+                coin.type = 1;
+        }
+
+        decorations.get(decorations.size()-1).add(coin);
+    }
+
+    private void recordPowerup(int x, int y){
+        Decoration block = new Decoration();
+        block.x = x;
+        block.y = y;
+        block.type = 2;
+        block.blockType = 1;
+
+        decorations.get(decorations.size()-1).add(block);
+    }
+
+    private void recordEmptyBlock(int x, int y) {
+        Decoration block = new Decoration();
+        block.x = x;
+        block.y = y;
+        block.type = 2;
+        block.blockType = 2;
+
+        decorations.get(decorations.size()-1).add(block);
+    }
+
+    private void recordEnemy(int x, int y, int type) {
+        Decoration enemy = new Decoration();
+        enemy.x = x;
+        enemy.y = y;
+        enemy.type = 0;
+        enemy.enemyType = type;
+
+        decorations.get(decorations.size()-1).add(enemy);
+
+    }
 
 }
