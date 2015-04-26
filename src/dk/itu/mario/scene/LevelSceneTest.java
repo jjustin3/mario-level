@@ -59,15 +59,15 @@ import dk.itu.mario.res.ResourcesManager;
 
 		        if(level==null)
 		        	if(isCustom){
-		        		MyLevelGenerator clg = new MyLevelGenerator(); // CHANGE HERE TO TEST DIFFERENT LEVEL GENERATORS
+		        		MyLevelGenerator clg = new MyLevelGenerator();
 		        		GamePlay gp = new GamePlay();
 		        		gp = gp.read("player.txt");
 		        		currentLevel = (Level)clg.generateLevel(gp);
-
+		        		
 		        		//You can use the following commands if you want to benefit from
 		        		//	the interface containing detailed information
 		        		String detailedInfo = FileHandler.readFile("DetailedInfo.txt");
-
+		                
 		              }
 			        	else
 		        		currentLevel = new RandomLevel(320, 15, levelSeed, levelDifficulty,levelType);
@@ -141,7 +141,7 @@ import dk.itu.mario.res.ResourcesManager;
 			public void winActions(){
 				if(recorder != null)
 				recorder.fillGamePlayMetrics((RandomLevel)level);
-
+				
 				marioComponent.win();
 			}
 

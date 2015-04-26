@@ -527,15 +527,6 @@ public class MyLevel extends Level{
         }
     }
 
-	private void undecorate(int blockIndex) {
-		for(Decoration dec : decorations.get(blockIndex)) {
-			if(dec.type != 0) //0 is an enemy -> don't do
-				setBlock(dec.x, dec.y, (byte) 0);
-			//else
-				//removeSpriteTemplate(dec.x, dec.y); //remove the enemy -> need to specify where method is
-		}
-	}
-
     private void fixWalls()
     {
         boolean[][] blockMap = new boolean[width + 1][height + 1];
@@ -720,32 +711,6 @@ public class MyLevel extends Level{
 
         return clone;
 	}
-
-	/**
-    public RandomLevel clone() throws CloneNotSupportedException {
-
-    	RandomLevel clone=new RandomLevel(width, height);
-
-    	clone.xExit = xExit;
-    	clone.yExit = yExit;
-    	byte[][] map = getMap();
-    	SpriteTemplate[][] st = getSpriteTemplate();
-
-    	for (int i = 0; i < map.length; i++)
-    		for (int j = 0; j < map[i].length; j++) {
-    			clone.setBlock(i, j, map[i][j]);
-    			clone.setSpriteTemplate(i, j, st[i][j]);
-    	}
-    	clone.BLOCKS_COINS = BLOCKS_COINS;
-    	clone.BLOCKS_EMPTY = BLOCKS_EMPTY;
-    	clone.BLOCKS_POWER = BLOCKS_POWER;
-    	clone.ENEMIES = ENEMIES;
-    	clone.COINS = COINS;
-
-        return clone;
-
-      }
-	**/
 
 	private int getDifficulty(GamePlay playerMetrics) {
 		//percentage of time allowed to [1-10] difficulty

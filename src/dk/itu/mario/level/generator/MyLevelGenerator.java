@@ -15,7 +15,11 @@ public class MyLevelGenerator extends CustomizedLevelGenerator implements LevelG
 
 	public LevelInterface generateLevel(GamePlay playerMetrics) {
 		LevelInterface level = new MyLevel(320,15,new Random().nextLong(),1,LevelInterface.TYPE_OVERGROUND,playerMetrics);
-		level = this.simulatedAnnealing(playerMetrics, level);
+		try {
+			level = this.simulatedAnnealing(playerMetrics, level);
+		} catch(CloneNotSupportedException e) {
+			e.printStackTrace();
+		}
 		return level;
 	}
 
@@ -25,14 +29,14 @@ public class MyLevelGenerator extends CustomizedLevelGenerator implements LevelG
 		return null;
 	}
 
-	public LevelInterface simulatedAnnealing(GamePlay playerMetrics, LevelInterface interface) throws CloneNotSupportedException {
-		MyLevel level = (MyLevel) interface;	// original solution
-		MyLevel best = level;	// running best solution
+	public LevelInterface simulatedAnnealing(GamePlay playerMetrics, LevelInterface level) throws CloneNotSupportedException {
+		MyLevel currLevel = (MyLevel) level;	// original solution
+		MyLevel best = currLevel;	// running best solution
 		double temperature = 10;
 		double coolingRate = 0.97;
 		int iterations = 50;
 		double iterationRate = 1.02;
-		int totalIterations = 500;
+		int totalIterations = 150;
 		int numIterations = 0;
 
 		if(random == null)
@@ -40,17 +44,19 @@ public class MyLevelGenerator extends CustomizedLevelGenerator implements LevelG
 
 		while(numIterations < totalIterations) {
 			for(int i = 0; i < iterations; i++) {
-				MyLevel newLevel = level.clone(); //check here
-				if((newLevel.eval(playerMetrics) < level.eval(playerMetrics)) || (random.nextDouble() < Math.exp((level.eval(playerMetrics)-newLevel.eval(playerMetrics))/temperature))) {
-					level = newLevel;
-					if(level.eval(playerMetrics) < best.eval(playerMetrics))
-						best = level;
+				MyLevel newLevel = currLevel.clone(); //check here
+				if((newLevel.eval(playerMetrics) < currLevel.eval(playerMetrics)) || (random.nextDouble() < Math.exp((currLevel.eval(playerMetrics)-newLevel.eval(playerMetrics))/temperature))) {
+					currLevel = newLevel;
+					if(currLevel.eval(playerMetrics) < best.eval(playerMetrics))
+						best = currLevel;
 				}
 			}
 
 			temperature *= coolingRate;
 			iterations *= iterationRate;
+			numIterations++;
 		}
+		System.out.println(playerMetrics.coinsCollected);
 
 		return (LevelInterface) best;
 	}
